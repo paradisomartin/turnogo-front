@@ -1,6 +1,8 @@
 import { useAuth } from '../contexts/auth-context'
 import Modal from '../components/ui/Modal'
 import { useModal } from '../hooks/useModal'
+import ClubForm from '../components/forms/ClubForm'
+import CourtForm from '../components/forms/CourtForm'
 import type { UserRole } from '../types'
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -111,21 +113,20 @@ export default function Dashboard() {
       </div>
 
       {/* Modal: Agregar cancha */}
-      <Modal open={addCourtModal.isOpen} onClose={addCourtModal.close} title="Agregar cancha" description="Completá los datos de la nueva cancha">
-        <p className="text-base-content/60 text-sm py-4">Formulario de cancha — próximamente</p>
-        <div className="modal-action">
-          <button className="btn" onClick={addCourtModal.close}>Cancelar</button>
-          <button className="btn btn-primary">Guardar</button>
-        </div>
+      <Modal open={addCourtModal.isOpen} onClose={addCourtModal.close} title="Agregar cancha" description="Completá los datos de la nueva cancha" persistent>
+        <CourtForm
+          fixedClubId={isOwner ? user?.clubId : undefined}
+          onSuccess={() => addCourtModal.close()}
+          onCancel={addCourtModal.close}
+        />
       </Modal>
 
       {/* Modal: Agregar club */}
-      <Modal open={addClubModal.isOpen} onClose={addClubModal.close} title="Agregar club" description="Completá los datos del nuevo club">
-        <p className="text-base-content/60 text-sm py-4">Formulario de club — próximamente</p>
-        <div className="modal-action">
-          <button className="btn" onClick={addClubModal.close}>Cancelar</button>
-          <button className="btn btn-primary">Guardar</button>
-        </div>
+      <Modal open={addClubModal.isOpen} onClose={addClubModal.close} title="Agregar club" description="Completá los datos del nuevo club" persistent>
+        <ClubForm
+          onSuccess={() => addClubModal.close()}
+          onCancel={addClubModal.close}
+        />
       </Modal>
     </div>
   )
