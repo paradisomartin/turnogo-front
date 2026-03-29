@@ -10,7 +10,7 @@ export default function Dashboard() {
           <span className="text-xl font-bold">TurnoGo</span>
         </div>
         <div className="flex-none gap-2">
-          <span className="text-sm text-base-content/60">{user?.email}</span>
+          <span className="text-sm text-base-content/60">{user?.nombre} {user?.apellido}</span>
           <button className="btn btn-ghost btn-sm" onClick={logout}>
             Salir
           </button>

@@ -3,10 +3,15 @@ export type UserRole = 'admin' | 'jugador'
 export interface User {
   id: string
   email: string
-  name: string
-  role: UserRole
+  nombre: string
+  apellido: string
+  telefono?: string
+  rol: UserRole
+  createdAt: string
+  updatedAt: string
 }
 
-export interface AuthTokens {
+export interface AuthResponse {
   access_token: string
+  user: User
 }

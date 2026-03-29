@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
 import api from '../lib/api'
-import type { User } from '../types'
+import type { AuthResponse, User } from '../types'
 
 interface AuthContextValue {
   user: User | null
@@ -29,10 +29,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function login(email: string, password: string) {
-    const { data } = await api.post<{ access_token: string }>('/auth/login', { email, password })
+    const { data } = await api.post<AuthResponse>('/auth/login', { email, password })
     localStorage.setItem('token', data.access_token)
-    const profile = await api.get<User>('/users/me')
-    setUser(profile.data)
+    setUser(data.user)
   }
 
   function logout() {
