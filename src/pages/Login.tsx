@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/auth-context'
 
 const schema = z.object({
@@ -75,6 +75,11 @@ export default function Login() {
               {isSubmitting ? <span className="loading loading-spinner loading-sm" /> : 'Ingresar'}
             </button>
           </form>
+
+          <p className="text-center text-sm text-base-content/60 mt-2">
+            ¿No tenés cuenta?{' '}
+            <Link to="/register" className="link link-primary">Registrate</Link>
+          </p>
         </div>
       </div>
     </div>
