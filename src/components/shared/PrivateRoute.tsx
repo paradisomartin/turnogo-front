@@ -1,8 +1,9 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/auth-context'
+import RoleSelect from '../../pages/RoleSelect'
 
 export default function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, activeRole, pendingRoles, loading } = useAuth()
 
   if (loading) {
     return (
@@ -12,5 +13,10 @@ export default function PrivateRoute({ children }: { children: React.ReactNode }
     )
   }
 
-  return user ? <>{children}</> : <Navigate to="/login" replace />
+  if (!user) return <Navigate to="/login" replace />
+
+  // Multi-role user: show role selection screen
+  if (pendingRoles && !activeRole) return <RoleSelect />
+
+  return <>{children}</>
 }

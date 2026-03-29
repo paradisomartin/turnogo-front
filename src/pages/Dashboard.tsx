@@ -1,14 +1,29 @@
 import { useAuth } from '../contexts/auth-context'
 import Modal from '../components/ui/Modal'
 import { useModal } from '../hooks/useModal'
+import type { UserRole } from '../types'
+
+const ROLE_LABELS: Record<UserRole, string> = {
+  player:     'Jugador',
+  owner:      'Administrador',
+  superadmin: 'Superadmin',
+}
 
 export default function Dashboard() {
-  const { user, logout } = useAuth()
+  const { user, activeRole, selectRole, logout } = useAuth()
   const addCourtModal = useModal()
-  const addClubModal = useModal()
+  const addClubModal  = useModal()
 
-  const isOwner = user?.rol === 'owner'
-  const isSuperadmin = user?.rol === 'superadmin'
+  const isOwner      = activeRole === 'owner'
+  const isSuperadmin = activeRole === 'superadmin'
+
+  // Roles the user can switch to (excluding the current one)
+  const switchableRoles = (user?.rol === 'superadmin'
+    ? ['superadmin', 'owner', 'player']
+    : user?.rol === 'owner'
+    ? ['owner', 'player']
+    : []
+  ).filter((r) => r !== activeRole) as UserRole[]
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -20,8 +35,30 @@ export default function Dashboard() {
         <div className="flex-none flex items-center gap-3">
           <div className="text-right hidden sm:block">
             <p className="text-sm font-medium">{user?.nombre} {user?.apellido}</p>
-            <p className="text-xs text-base-content/50 capitalize">{user?.rol}</p>
+            <p className="text-xs text-base-content/50">{activeRole ? ROLE_LABELS[activeRole] : ''}</p>
           </div>
+
+          {/* Switch role dropdown */}
+          {switchableRoles.length > 0 && (
+            <div className="dropdown dropdown-end">
+              <button tabIndex={0} className="btn btn-ghost btn-sm btn-circle" title="Cambiar vista">
+                <svg xmlns="http://www.w3.org/2000/svg" className="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </button>
+              <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box shadow z-10 w-44 p-2 mt-2">
+                <li className="menu-title text-xs">Cambiar vista</li>
+                {switchableRoles.map((role) => (
+                  <li key={role}>
+                    <button onClick={() => selectRole(role)}>{ROLE_LABELS[role]}</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <button className="btn btn-ghost btn-sm" onClick={logout}>Salir</button>
         </div>
       </div>
@@ -29,17 +66,14 @@ export default function Dashboard() {
       <div className="p-6 max-w-5xl mx-auto">
         {/* Actions bar */}
         <div className="flex flex-wrap gap-2 mb-6">
-          {/* Player */}
           <button className="btn btn-primary">Reservar turno</button>
 
-          {/* Owner + SuperAdmin */}
           {(isOwner || isSuperadmin) && (
             <button className="btn btn-secondary" onClick={addCourtModal.open}>
               + Agregar cancha
             </button>
           )}
 
-          {/* SuperAdmin only */}
           {isSuperadmin && (
             <button className="btn btn-accent" onClick={addClubModal.open}>
               + Agregar club
@@ -77,12 +111,7 @@ export default function Dashboard() {
       </div>
 
       {/* Modal: Agregar cancha */}
-      <Modal
-        open={addCourtModal.isOpen}
-        onClose={addCourtModal.close}
-        title="Agregar cancha"
-        description="Completá los datos de la nueva cancha"
-      >
+      <Modal open={addCourtModal.isOpen} onClose={addCourtModal.close} title="Agregar cancha" description="Completá los datos de la nueva cancha">
         <p className="text-base-content/60 text-sm py-4">Formulario de cancha — próximamente</p>
         <div className="modal-action">
           <button className="btn" onClick={addCourtModal.close}>Cancelar</button>
@@ -90,13 +119,8 @@ export default function Dashboard() {
         </div>
       </Modal>
 
-      {/* Modal: Agregar club (superadmin) */}
-      <Modal
-        open={addClubModal.isOpen}
-        onClose={addClubModal.close}
-        title="Agregar club"
-        description="Completá los datos del nuevo club"
-      >
+      {/* Modal: Agregar club */}
+      <Modal open={addClubModal.isOpen} onClose={addClubModal.close} title="Agregar club" description="Completá los datos del nuevo club">
         <p className="text-base-content/60 text-sm py-4">Formulario de club — próximamente</p>
         <div className="modal-action">
           <button className="btn" onClick={addClubModal.close}>Cancelar</button>
