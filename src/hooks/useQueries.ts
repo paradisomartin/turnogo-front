@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '../lib/api'
-import type { Club, Court } from '../types'
+import type { Booking, Club, Court } from '../types'
 
 export function useClubs() {
   return useQuery({
@@ -16,5 +16,12 @@ export function useCourts(clubId?: string) {
       api
         .get<Court[]>('/courts', { params: clubId ? { clubId } : undefined })
         .then((r) => r.data),
+  })
+}
+
+export function useBookings() {
+  return useQuery({
+    queryKey: ['bookings'],
+    queryFn: () => api.get<Booking[]>('/bookings').then((r) => r.data),
   })
 }

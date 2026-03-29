@@ -1,9 +1,10 @@
 import { useAuth } from '../contexts/auth-context'
 import Modal from '../components/ui/Modal'
 import { useModal } from '../hooks/useModal'
-import { useClubs, useCourts } from '../hooks/useQueries'
+import { useClubs, useCourts, useBookings } from '../hooks/useQueries'
 import ClubForm from '../components/forms/ClubForm'
 import CourtForm from '../components/forms/CourtForm'
+import BookingForm from '../components/forms/BookingForm'
 import type { UserRole } from '../types'
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -19,19 +20,30 @@ const TIPO_LABELS: Record<string, string> = {
   cesped:    'Césped',
 }
 
+const ESTADO_BOOKING_LABELS: Record<string, string> = {
+  pendiente:  'Pendiente',
+  confirmada: 'Confirmada',
+  cancelada:  'Cancelada',
+  completada: 'Completada',
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
 export default function Dashboard() {
   const { user, activeRole, selectRole, logout } = useAuth()
-  const addCourtModal = useModal()
-  const addClubModal  = useModal()
+  const addCourtModal   = useModal()
+  const addClubModal    = useModal()
+  const addBookingModal = useModal()
 
+  const isPlayer     = activeRole === 'player'
   const isOwner      = activeRole === 'owner'
   const isSuperadmin = activeRole === 'superadmin'
 
-  // Fetch data based on role
-  const { data: clubs = [], isLoading: loadingClubs } = useClubs()
-  const { data: courts = [], isLoading: loadingCourts } = useCourts(
-    isOwner ? user?.clubId : undefined
-  )
+  const { data: clubs = [],    isLoading: loadingClubs }   = useClubs()
+  const { data: courts = [],   isLoading: loadingCourts }  = useCourts(isOwner ? user?.clubId : undefined)
+  const { data: bookings = [], isLoading: loadingBookings } = useBookings()
 
   const switchableRoles = (user?.rol === 'superadmin'
     ? ['superadmin', 'owner', 'player']
@@ -78,7 +90,7 @@ export default function Dashboard() {
       <div className="p-6 max-w-5xl mx-auto space-y-8">
         {/* Actions */}
         <div className="flex flex-wrap gap-2">
-          <button className="btn btn-primary">Reservar turno</button>
+          <button className="btn btn-primary" onClick={addBookingModal.open}>Reservar turno</button>
           {(isOwner || isSuperadmin) && (
             <button className="btn btn-secondary" onClick={addCourtModal.open}>+ Agregar cancha</button>
           )}
@@ -187,21 +199,76 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* ── MIS RESERVAS (player) ──────────────────────────── */}
-        {activeRole === 'player' && (
-          <section>
-            <h2 className="text-lg font-semibold mb-3">Mis reservas</h2>
+        {/* ── RESERVAS (all roles) ───────────────────────────── */}
+        <section>
+          <h2 className="text-lg font-semibold mb-3">
+            {isPlayer ? 'Mis reservas' : 'Reservas'}
+          </h2>
+          {loadingBookings ? (
+            <div className="space-y-2">
+              {[1,2,3].map(i => <div key={i} className="skeleton h-14 w-full rounded-xl" />)}
+            </div>
+          ) : bookings.length === 0 ? (
             <div className="card bg-base-100 shadow">
               <div className="card-body items-center text-center py-8">
-                <p className="text-base-content/50 text-sm">Todavía no tenés turnos reservados.</p>
-                <button className="btn btn-primary btn-sm mt-2">Reservar turno</button>
+                <p className="text-base-content/50 text-sm">Todavía no hay turnos reservados.</p>
+                <button className="btn btn-primary btn-sm mt-2" onClick={addBookingModal.open}>Reservar turno</button>
               </div>
             </div>
-          </section>
-        )}
+          ) : (
+            <div className="card bg-base-100 shadow overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Horario</th>
+                      <th>Cancha</th>
+                      <th>Club</th>
+                      {!isPlayer && <th>Jugador</th>}
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bookings.map((b) => (
+                      <tr key={b.id} className="hover">
+                        <td className="text-sm">{formatDate(b.fecha)}</td>
+                        <td className="text-sm tabular-nums">{b.horaInicio} – {b.horaFin}</td>
+                        <td className="font-medium">{b.court?.nombre ?? '—'}</td>
+                        <td className="text-base-content/60">{b.court?.club?.nombre ?? '—'}</td>
+                        {!isPlayer && (
+                          <td className="text-base-content/60 text-sm">
+                            {b.user ? `${b.user.nombre} ${b.user.apellido}` : '—'}
+                          </td>
+                        )}
+                        <td>
+                          <span className={`badge badge-sm ${
+                            b.estado === 'confirmada' ? 'badge-success' :
+                            b.estado === 'pendiente'  ? 'badge-warning' :
+                            b.estado === 'cancelada'  ? 'badge-error'   : 'badge-ghost'
+                          }`}>
+                            {ESTADO_BOOKING_LABELS[b.estado] ?? b.estado}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </section>
       </div>
 
       {/* Modals */}
+      <Modal open={addBookingModal.isOpen} onClose={addBookingModal.close} title="Reservar turno" description="Seleccioná el club, la cancha, fecha y horario" persistent>
+        <BookingForm
+          fixedClubId={isOwner ? user?.clubId : undefined}
+          onSuccess={() => addBookingModal.close()}
+          onCancel={addBookingModal.close}
+        />
+      </Modal>
+
       <Modal open={addCourtModal.isOpen} onClose={addCourtModal.close} title="Agregar cancha" description="Completá los datos de la nueva cancha" persistent>
         <CourtForm
           fixedClubId={isOwner ? user?.clubId : undefined}
