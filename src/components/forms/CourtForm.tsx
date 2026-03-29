@@ -9,7 +9,6 @@ import type { Court } from '../../types'
 
 const schema = z.object({
   clubId:      z.string().min(1, 'Seleccioná un club'),
-  nombre:      z.string().min(1, 'Requerido'),
   tipo:        z.enum(['blindex', 'cemento', 'sintetico', 'cesped']).optional(),
   iluminacion: z.boolean().optional(),
   techada:     z.boolean().optional(),
@@ -68,11 +67,9 @@ export default function CourtForm({ fixedClubId, onSuccess, onCancel }: Props) {
         </div>
       )}
 
-      <div className="form-control">
-        <label className="label"><span className="label-text">Nombre <span className="text-error">*</span></span></label>
-        <input {...register('nombre')} type="text" placeholder="Cancha 1" className="input input-bordered w-full" />
-        {errors.nombre && <span className="text-error text-xs mt-1">{errors.nombre.message}</span>}
-      </div>
+      <p className="text-base-content/50 text-sm -mt-1">
+        El nombre se asigna automáticamente (Cancha 1, Cancha 2, etc.)
+      </p>
 
       <div className="form-control">
         <label className="label"><span className="label-text">Tipo de superficie</span></label>

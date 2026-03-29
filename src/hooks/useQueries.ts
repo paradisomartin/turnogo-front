@@ -25,3 +25,21 @@ export function useBookings() {
     queryFn: () => api.get<Booking[]>('/bookings').then((r) => r.data),
   })
 }
+
+export interface Slot {
+  horaInicio: string
+  horaFin:    string
+  disponible: boolean
+  canchasLibres: number
+}
+
+export function useAvailableSlots(clubId: string | undefined, fecha: string | undefined) {
+  return useQuery({
+    queryKey: ['available-slots', clubId, fecha],
+    queryFn: () =>
+      api
+        .get<Slot[]>('/bookings/available-slots', { params: { clubId, fecha } })
+        .then((r) => r.data),
+    enabled: Boolean(clubId && fecha),
+  })
+}

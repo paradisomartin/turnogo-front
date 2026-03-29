@@ -1,27 +1,9 @@
-import { useForm, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../../lib/api'
-import { useClubs, useCourts } from '../../hooks/useQueries'
+import { useClubs, useAvailableSlots } from '../../hooks/useQueries'
 import { useAuth } from '../../contexts/auth-context'
 import type { Booking } from '../../types'
-
-const schema = z
-  .object({
-    clubId:     z.string().min(1, 'Seleccioná un club'),
-    courtId:    z.string().min(1, 'Seleccioná una cancha'),
-    fecha:      z.string().min(1, 'Seleccioná una fecha'),
-    horaInicio: z.string().min(1, 'Ingresá hora de inicio'),
-    horaFin:    z.string().min(1, 'Ingresá hora de fin'),
-    notas:      z.string().optional(),
-  })
-  .refine((d) => d.horaFin > d.horaInicio, {
-    message: 'La hora de fin debe ser posterior al inicio',
-    path: ['horaFin'],
-  })
-
-type FormData = z.infer<typeof schema>
 
 interface Props {
   fixedClubId?: string
@@ -35,45 +17,59 @@ export default function BookingForm({ fixedClubId, onSuccess, onCancel }: Props)
 
   const { data: clubs = [], isLoading: loadingClubs } = useClubs()
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-  } = useForm<FormData>({
-    resolver: zodResolver(schema),
-    defaultValues: { clubId: fixedClubId ?? '' },
-  })
+  const [clubId, setClubId]         = useState(fixedClubId ?? '')
+  const [fecha, setFecha]           = useState('')
+  const [selectedSlot, setSlot]     = useState<string | null>(null) // horaInicio
+  const [clubError, setClubError]   = useState('')
+  const [fechaError, setFechaError] = useState('')
+  const [slotError, setSlotError]   = useState('')
 
-  const selectedClubId = useWatch({ control, name: 'clubId' })
-  const { data: courts = [], isLoading: loadingCourts } = useCourts(
-    selectedClubId || undefined
+  const today = new Date().toISOString().split('T')[0]
+
+  const { data: slots = [], isLoading: loadingSlots } = useAvailableSlots(
+    clubId || undefined,
+    fecha || undefined,
   )
-  const activeCourts = courts.filter((c) => c.estado === 'activa')
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) =>
+    mutationFn: () =>
       api
         .post<Booking>('/bookings', {
-          userId:      user!.id,
-          courtId:     data.courtId,
-          fecha:       data.fecha,
-          horaInicio:  data.horaInicio,
-          horaFin:     data.horaFin,
-          notas:       data.notas || undefined,
+          userId:     user!.id,
+          clubId:     clubId,
+          horaInicio: selectedSlot,
+          fecha,
           metodoReserva: 'web',
         })
         .then((r) => r.data),
     onSuccess: (booking) => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] })
+      queryClient.invalidateQueries({ queryKey: ['available-slots'] })
       onSuccess(booking)
     },
   })
 
-  const today = new Date().toISOString().split('T')[0]
+  function validate() {
+    let ok = true
+    if (!clubId)       { setClubError('Seleccioná un club'); ok = false }
+    else               setClubError('')
+    if (!fecha)        { setFechaError('Seleccioná una fecha'); ok = false }
+    else               setFechaError('')
+    if (!selectedSlot) { setSlotError('Seleccioná un horario'); ok = false }
+    else               setSlotError('')
+    return ok
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!validate()) return
+    mutation.mutate()
+  }
+
+  const selectedSlotData = slots.find((s) => s.horaInicio === selectedSlot)
 
   return (
-    <form onSubmit={handleSubmit((data) => mutation.mutate(data))} className="flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       {/* Club */}
       {!fixedClubId && (
         <div className="form-control">
@@ -81,69 +77,85 @@ export default function BookingForm({ fixedClubId, onSuccess, onCancel }: Props)
           {loadingClubs ? (
             <div className="skeleton h-12 w-full rounded-lg" />
           ) : (
-            <select {...register('clubId')} className="select select-bordered w-full">
+            <select
+              value={clubId}
+              onChange={(e) => { setClubId(e.target.value); setSlot(null) }}
+              className="select select-bordered w-full"
+            >
               <option value="">Seleccioná un club</option>
               {clubs.map((c) => (
                 <option key={c.id} value={c.id}>{c.nombre}</option>
               ))}
             </select>
           )}
-          {errors.clubId && <span className="text-error text-xs mt-1">{errors.clubId.message}</span>}
+          {clubError && <span className="text-error text-xs mt-1">{clubError}</span>}
         </div>
       )}
-
-      {/* Court */}
-      <div className="form-control">
-        <label className="label"><span className="label-text">Cancha <span className="text-error">*</span></span></label>
-        {loadingCourts ? (
-          <div className="skeleton h-12 w-full rounded-lg" />
-        ) : (
-          <select {...register('courtId')} className="select select-bordered w-full" disabled={!selectedClubId}>
-            <option value="">{selectedClubId ? 'Seleccioná una cancha' : 'Primero seleccioná un club'}</option>
-            {activeCourts.map((c) => (
-              <option key={c.id} value={c.id}>{c.nombre}</option>
-            ))}
-          </select>
-        )}
-        {errors.courtId && <span className="text-error text-xs mt-1">{errors.courtId.message}</span>}
-      </div>
 
       {/* Date */}
       <div className="form-control">
         <label className="label"><span className="label-text">Fecha <span className="text-error">*</span></span></label>
         <input
-          {...register('fecha')}
           type="date"
           min={today}
+          value={fecha}
+          onChange={(e) => { setFecha(e.target.value); setSlot(null) }}
           className="input input-bordered w-full"
         />
-        {errors.fecha && <span className="text-error text-xs mt-1">{errors.fecha.message}</span>}
+        {fechaError && <span className="text-error text-xs mt-1">{fechaError}</span>}
       </div>
 
-      {/* Time range */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="form-control">
-          <label className="label"><span className="label-text">Hora inicio <span className="text-error">*</span></span></label>
-          <input {...register('horaInicio')} type="time" className="input input-bordered w-full" />
-          {errors.horaInicio && <span className="text-error text-xs mt-1">{errors.horaInicio.message}</span>}
-        </div>
-        <div className="form-control">
-          <label className="label"><span className="label-text">Hora fin <span className="text-error">*</span></span></label>
-          <input {...register('horaFin')} type="time" className="input input-bordered w-full" />
-          {errors.horaFin && <span className="text-error text-xs mt-1">{errors.horaFin.message}</span>}
-        </div>
-      </div>
-
-      {/* Notes */}
+      {/* Slot picker */}
       <div className="form-control">
-        <label className="label"><span className="label-text">Notas</span></label>
-        <textarea {...register('notas')} className="textarea textarea-bordered w-full" rows={2} placeholder="Opcional" />
+        <label className="label"><span className="label-text">Horario <span className="text-error">*</span></span></label>
+
+        {!clubId || !fecha ? (
+          <p className="text-base-content/40 text-sm">Seleccioná club y fecha para ver los turnos disponibles.</p>
+        ) : loadingSlots ? (
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {Array.from({ length: 10 }).map((_, i) => (
+              <div key={i} className="skeleton h-12 rounded-lg" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {slots.map((s) => {
+              const isSelected = selectedSlot === s.horaInicio
+              return (
+                <button
+                  key={s.horaInicio}
+                  type="button"
+                  disabled={!s.disponible}
+                  onClick={() => setSlot(s.horaInicio)}
+                  className={[
+                    'btn btn-sm h-auto py-2 flex-col gap-0',
+                    isSelected
+                      ? 'btn-primary'
+                      : s.disponible
+                      ? 'btn-outline'
+                      : 'btn-ghost opacity-40 cursor-not-allowed line-through',
+                  ].join(' ')}
+                >
+                  <span className="text-xs font-semibold">{s.horaInicio}</span>
+                  <span className="text-[10px] font-normal opacity-70">{s.horaFin}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {selectedSlotData && (
+          <p className="text-xs text-base-content/50 mt-2">
+            Turno: {selectedSlotData.horaInicio} – {selectedSlotData.horaFin} &middot; {selectedSlotData.canchasLibres} cancha{selectedSlotData.canchasLibres !== 1 ? 's' : ''} libre{selectedSlotData.canchasLibres !== 1 ? 's' : ''}
+          </p>
+        )}
+        {slotError && <span className="text-error text-xs mt-1">{slotError}</span>}
       </div>
 
       {mutation.isError && (
         <div className="alert alert-error text-sm">
           <span>
-            {(mutation.error as any)?.response?.data?.message ?? 'Error al crear la reserva. Verificá los datos.'}
+            {(mutation.error as any)?.response?.data?.message ?? 'Error al crear la reserva.'}
           </span>
         </div>
       )}
